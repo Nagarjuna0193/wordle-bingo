@@ -1,0 +1,6 @@
+{
+  "name": "Wordle Bingo",
+  "description": "An addictive fusion of Wordle and Bingo! Solve 5-letter word puzzles to complete conditions on your 5x5 Bingo board. Earn gold chips, trigger power-ups, and aim for a Full House!",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
