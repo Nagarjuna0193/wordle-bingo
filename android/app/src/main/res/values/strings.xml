@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Wordle Bingo</string>
+    <string name="title_activity_main">Wordle Bingo</string>
+    <string name="package_name">com.nagarjuna.wordlebingo</string>
+    <string name="custom_url_scheme">com.nagarjuna.wordlebingo</string>
+</resources>
