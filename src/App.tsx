@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  Trophy, Sparkles, HelpCircle, RefreshCw, Zap, Flame, 
-  Coins, Info, ArrowRight, AlertTriangle, AlertCircle, X, CheckSquare
+import {
+  Trophy, Sparkles, HelpCircle, RefreshCw, Zap, Flame,
+  Coins, Info, ArrowRight, AlertTriangle, AlertCircle, X, CheckSquare, ShoppingBag
 } from 'lucide-react';
 
 import { BingoCell, GameStats, PowerUp } from './types';
@@ -13,6 +13,9 @@ import BingoBoard from './components/BingoBoard';
 import WordleGame from './components/WordleGame';
 import StatsPanel from './components/StatsPanel';
 import InstructionsModal from './components/InstructionsModal';
+import StoreModal from './components/StoreModal';
+import { initAds, showBannerAd, hideBannerAd, showInterstitialAd, loadInterstitialAd } from './services/ads';
+import { initIAP } from './services/iap';
 
 // List of winning combinations for the 5x5 Bingo board
 const WINNING_LINES = [
@@ -99,6 +102,8 @@ export default function App() {
 
   // UI States
   const [isInstructionsOpen, setIsInstructionsOpen] = useState<boolean>(false);
+  const [isStoreOpen, setIsStoreOpen] = useState<boolean>(false);
+  const [adsRemoved, setAdsRemoved] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
   const [invalidWordShake, setInvalidWordShake] = useState<boolean>(false);
   const [roundEarnedStamps, setRoundEarnedStamps] = useState<string[]>([]);
@@ -106,6 +111,16 @@ export default function App() {
 
   // Load Initial Game State
   useEffect(() => {
+    // 0. Init native plugins
+    initIAP().catch(() => {});
+    initAds().then(() => {
+      const noAds = localStorage.getItem('wordle_bingo_ads_removed') === 'true';
+      if (!noAds) {
+        showBannerAd().catch(() => {});
+        loadInterstitialAd().catch(() => {});
+      }
+    }).catch(() => {});
+
     // 1. Visit Check for instructions
     const visited = localStorage.getItem('wordle_bingo_visited');
     if (!visited) {
@@ -113,7 +128,12 @@ export default function App() {
       localStorage.setItem('wordle_bingo_visited', 'true');
     }
 
-    // 2. Load Stats
+    // 2. Load ads-removed flag
+    if (localStorage.getItem('wordle_bingo_ads_removed') === 'true') {
+      setAdsRemoved(true);
+    }
+
+    // 4. Load Stats
     const savedStats = localStorage.getItem('wordle_bingo_stats');
     if (savedStats) {
       try {
@@ -123,7 +143,7 @@ export default function App() {
       }
     }
 
-    // 3. Load Powerups Inventory
+    // 5. Load Powerups Inventory
     const savedPowerups = localStorage.getItem('wordle_bingo_powerups');
     if (savedPowerups) {
       try {
@@ -133,7 +153,7 @@ export default function App() {
       }
     }
 
-    // 4. Load Bingo Board
+    // 6. Load Bingo Board
     const savedBoard = localStorage.getItem('wordle_bingo_board');
     if (savedBoard) {
       try {
@@ -151,7 +171,7 @@ export default function App() {
       localStorage.setItem('wordle_bingo_board', JSON.stringify(newBoard));
     }
 
-    // 5. Load or Start Round
+    // 7. Load or Start Round
     const savedSecret = localStorage.getItem('wordle_bingo_secret_word');
     const savedGuesses = localStorage.getItem('wordle_bingo_guesses');
     const savedStatus = localStorage.getItem('wordle_bingo_game_status');
@@ -185,6 +205,7 @@ export default function App() {
 
   // Helper to start a fresh Wordle round
   const startFreshRound = () => {
+    if (!adsRemoved) showInterstitialAd().catch(() => {});
     const newWord = getRandomWord();
     setSecretWord(newWord);
     setGuesses([]);
@@ -562,6 +583,19 @@ export default function App() {
     return id === 'wildcard' && activePowerUp === 'wildcard';
   };
 
+  // Store purchase handlers
+  const handlePurchaseCoins = (amount: number) => {
+    const updatedStats = { ...stats, chips: stats.chips + amount };
+    setStats(updatedStats);
+    localStorage.setItem('wordle_bingo_stats', JSON.stringify(updatedStats));
+  };
+
+  const handleRemoveAds = () => {
+    setAdsRemoved(true);
+    localStorage.setItem('wordle_bingo_ads_removed', 'true');
+    hideBannerAd().catch(() => {});
+  };
+
   // Reroll Bingo Card Action
   const handleRerollBingoCard = () => {
     const confirmReroll = window.confirm(
@@ -600,11 +634,26 @@ export default function App() {
 
           {/* Quick Header Indicators */}
           <div className="flex items-center gap-3 font-display">
-            {/* Coins */}
-            <div className="flex items-center gap-2 bg-[#FFE66D] border-2 border-vibrant-dark px-4 py-2 rounded-2xl text-vibrant-dark text-sm font-black shadow-[3px_3px_0px_rgba(0,0,0,1)]">
+            {/* Coins — clickable to open store */}
+            <button
+              onClick={() => setIsStoreOpen(true)}
+              className="flex items-center gap-2 bg-[#FFE66D] border-2 border-vibrant-dark px-4 py-2 rounded-2xl text-vibrant-dark text-sm font-black shadow-[3px_3px_0px_rgba(0,0,0,1)] hover:opacity-90 transition-all cursor-pointer"
+              title="Buy Gold Chips"
+              id="header-chips-btn"
+            >
               <Coins className="w-4 h-4 text-vibrant-dark animate-pulse" />
               <span>{stats.chips} CHIPS</span>
-            </div>
+            </button>
+
+            {/* Store Button */}
+            <button
+              onClick={() => setIsStoreOpen(true)}
+              className="p-2.5 border-2 border-vibrant-dark bg-vibrant-dark rounded-2xl text-white hover:opacity-80 shadow-[3px_3px_0px_rgba(0,0,0,1)] transition-all cursor-pointer"
+              title="Store"
+              id="header-store-btn"
+            >
+              <ShoppingBag className="w-5 h-5 stroke-[2.5]" />
+            </button>
 
             {/* Help Icon */}
             <button
@@ -693,6 +742,16 @@ export default function App() {
       <InstructionsModal
         isOpen={isInstructionsOpen}
         onClose={() => setIsInstructionsOpen(false)}
+      />
+
+      {/* Store Modal */}
+      <StoreModal
+        isOpen={isStoreOpen}
+        onClose={() => setIsStoreOpen(false)}
+        chips={stats.chips}
+        adsRemoved={adsRemoved}
+        onPurchaseCoins={handlePurchaseCoins}
+        onRemoveAds={handleRemoveAds}
       />
 
       {/* Toast Notification Banner */}
